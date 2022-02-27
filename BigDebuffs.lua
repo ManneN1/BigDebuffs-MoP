@@ -1,5 +1,7 @@
 local addonName = ...
 
+-- BigDebuffs by Jordon 
+-- Backported and general improvements by Konjunktur
 
 BigDebuffs = LibStub("AceAddon-3.0"):NewAddon("BigDebuffs", "AceEvent-3.0", "AceHook-3.0", "AceTimer-3.0")
 
