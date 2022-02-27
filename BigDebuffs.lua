@@ -1,8 +1,5 @@
 local addonName = ...
 
--- BigDebuffs by Jordon 
--- Backported and general improvements by Konjunktur
--- Spell list and minor improvements by Apparent
 
 BigDebuffs = LibStub("AceAddon-3.0"):NewAddon("BigDebuffs", "AceEvent-3.0", "AceHook-3.0", "AceTimer-3.0")
 
@@ -629,6 +626,9 @@ BigDebuffs.PriorityDebuffs = {
 	130736, -- Soul Reaper (Unholy)
 }
 
+-- Store interrupt spellId and start time
+BigDebuffs.units = {}
+
 local units = {
 	"player",
 	"pet",
@@ -803,16 +803,10 @@ function BigDebuffs:AttachUnitFrame(unit)
 
 	if not frame then
 		frame = CreateFrame("Button", frameName, UIParent, "BigDebuffsUnitFrameTemplate")
-		frame.icon = _G[frameName.."Icon"]
-		frame.cooldownContainer = CreateFrame("Button", frameName.."CooldownContainer", frame)
 		self.UnitFrames[unit] = frame
 		frame:SetScript("OnEvent", function() self:UNIT_AURA(unit) end)
 		frame.icon:SetDrawLayer("BORDER")
-		frame.cooldownContainer:SetPoint("CENTER")
-		frame.cooldown:SetParent(frame.cooldownContainer)
-		frame.cooldown:SetAllPoints()
-		frame.cooldown:SetAlpha(0.9)
-		
+		frame:RegisterUnitEvent("UNIT_AURA", unit)
 		frame:RegisterForDrag("LeftButton")
 		frame:SetMovable(true)
 		frame.unit = unit
@@ -883,8 +877,6 @@ function BigDebuffs:AttachUnitFrame(unit)
 		-- Manual
 		frame:SetParent(UIParent)
 		frame:ClearAllPoints()
-		frame:SetSize(config.size, config.size)
-		frame:SetFrameLevel(frame:GetParent():GetFrameLevel()+1)
 
 		if not self.db.profile.unitFrames[unit] then self.db.profile.unitFrames[unit] = {} end
 
@@ -933,9 +925,9 @@ end
 
 local TestDebuffs = {}
 
-function BigDebuffs:InsertTestDebuff(spellID)
-	local texture = select(3, GetSpellInfo(spellID))
-	table.insert(TestDebuffs, {spellID, texture})
+local function InsertTestDebuff(spellID, dispelType)
+	local texture = GetSpellTexture(spellID)
+	table.insert(TestDebuffs, { spellID, texture, 0, dispelType })
 end
 
 local function UnitDebuffTest(unit, index)
@@ -1230,6 +1222,11 @@ local function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter, 
 		expirationTime = spell.expires
 	else
 		self:CancelTimer(self.stances[guid].timer)
+		if (isBossBuff) then
+			name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitBuff(unit, index, filter);
+		else
+			name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitDebuff(unit, index, filter);
+		end
 	end
 	
 	self.stances[guid].stance = spellid
@@ -1550,6 +1547,7 @@ function BigDebuffs:UNIT_AURA(unit)
 
 	-- need to always look for a stance (if we only look for it once a player
 	-- changes stance we will never get back to it again once other auras fade)
+	-- Check for interrupt
 	local guid = UnitGUID(unit)
 	if self.stances[guid] then 
 		local stanceId = self.stances[guid].stance
@@ -1565,6 +1563,18 @@ function BigDebuffs:UNIT_AURA(unit)
 				icon = ico
 			end
 		end
+	if guid and self.units[guid] and self.units[guid].expires and self.units[guid].expires > GetTime() then
+		local spell = self.units[guid]
+		local spellId = spell.spellId
+		local p = self:GetAuraPriority(spellId)
+		if p and p >= priority and self.Spells[spellId] then
+			left = spell.expires - now
+			duration = self.Spells[spellId].duration
+			debuff = spellId
+			expires = spell.expires
+			icon = spellId == 137143 and"Interface\\AddOns\\".. addonName .."\\bloodhorror2"or GetSpellTexture(spellId)
+			interrupt = spellId
+		end		
 	end
 	
 
