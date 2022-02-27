@@ -1,3 +1,4 @@
+local addonName = ...
 
 -- BigDebuffs by Jordon 
 -- Backported and general improvements by Konjunktur
@@ -8,9 +9,36 @@ BigDebuffs = LibStub("AceAddon-3.0"):NewAddon("BigDebuffs", "AceEvent-3.0", "Ace
 -- Defaults
 local defaults = {
 	profile = {
+		raidFrames = {
+			maxDebuffs = 1,
+			anchor = "INNER",
+			enabled = true,
+			cooldownCount = true,
+			hideBliz = true,
+			redirectBliz = false,
+			increaseBuffs = false,
+			cc = 50,
+			dispellable = {
+				cc = 60,
+				roots = 50,
+			},
+			interrupts = 55,
+			roots = 40,
+			warning = 40,
+			default = 30,
+			special = 30,
+			pve = 50,
+			warningList = {
+				[88611] = true, -- Smoke Bomb
+				[81261] = true, -- Solar Beam
+				[30108] = true, -- Unstable Affliction
+				[34914] = true, -- Vampiric Touch
+			},
+		},
 		unitFrames = {
 			enabled = true,
 			cooldownCount = true,
+			tooltips = true,
 			player = {
 				enabled = true,
 				anchor = "auto",
@@ -57,14 +85,15 @@ local defaults = {
 			roots = true,
 		},
 		priority = {
-			immunities = 90,
-			immunities_spells = 80,
-			cc = 70,
-			interrupts = 60,
+			immunities = 80,
+			immunities_spells = 70,
+			cc = 60,
+			interrupts = 55,
 			buffs_defensive = 50,
 			buffs_offensive = 40,
 			buffs_other = 30,
 			roots = 20,
+			special = 19,
 		},
 		spells = {},
 	}
@@ -616,10 +645,25 @@ local units = {
 	"arena5",
 }
 
+local unitsWithRaid = {
+	"player",
+	"pet",
+	"target",
+	"focus",
+	"party1",
+	"party2",
+	"party3",
+	"party4",
+	"arena1",
+	"arena2",
+	"arena3",
+	"arena4",
+	"arena5",
+}
+
 for i = 1, 40 do
 	table.insert(unitsWithRaid, "raid" .. i)
 end
-
 
 local UnitDebuff, UnitBuff = UnitDebuff, UnitBuff
 
@@ -647,7 +691,7 @@ local GetAnchor = {
 
 local anchors = {
 	["ElvUI"] = {
-		noPortrait = true,
+		noPortait = true,
 		units = {
 			player = "ElvUF_Player",
 			pet = "ElvUF_Pet",
@@ -744,6 +788,7 @@ function BigDebuffs:Refresh()
 	for unit, frame in pairs(self.UnitFrames) do
 		frame:Hide()
 		frame.current = nil
+		--frame.cooldown:SetHideCountdownNumbers(not self.db.profile.unitFrames.cooldownCount)
 		frame.cooldown.noCooldownCount = not self.db.profile.unitFrames.cooldownCount
 		self:AttachUnitFrame(unit)
 		self:UNIT_AURA(nil, unit)
@@ -751,11 +796,7 @@ function BigDebuffs:Refresh()
 end
 
 function BigDebuffs:AttachUnitFrame(unit)
-	if InCombatLockdown() then 
-		unitsToUpdate[unit] = true
-		self:RegisterEvent("PLAYER_REGEN_ENABLED")
-		return 
-	end
+	if InCombatLockdown() then return end
 
 	local frame = self.UnitFrames[unit]
 	local frameName = "BigDebuffs" .. unit .. "UnitFrame"
@@ -765,6 +806,7 @@ function BigDebuffs:AttachUnitFrame(unit)
 		frame.icon = _G[frameName.."Icon"]
 		frame.cooldownContainer = CreateFrame("Button", frameName.."CooldownContainer", frame)
 		self.UnitFrames[unit] = frame
+		frame:SetScript("OnEvent", function() self:UNIT_AURA(unit) end)
 		frame.icon:SetDrawLayer("BORDER")
 		frame.cooldownContainer:SetPoint("CENTER")
 		frame.cooldown:SetParent(frame.cooldownContainer)
@@ -812,9 +854,11 @@ function BigDebuffs:AttachUnitFrame(unit)
 			-- Blizzard Frame
 			frame:SetParent(frame.anchor:GetParent())
 			frame:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel())
-			frame.cooldownContainer:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel()-1)
 			frame.cooldownContainer:SetSize(frame.anchor:GetWidth() - config.cdMod, frame.anchor:GetHeight() - config.cdMod)
+			frame.cooldown:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel())
 			frame.anchor:SetDrawLayer("BACKGROUND")
+            --frame.cooldown:SetMask("Interface\\CHARACTERFRAME\\TempPortraitAlphaMaskSmall")
+			--frame.cooldown:SetSwipeTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMaskSmall")
 		else
 			frame:SetParent(frame.parent and frame.parent or frame.anchor)
 			frame:SetFrameLevel(99)
@@ -839,13 +883,8 @@ function BigDebuffs:AttachUnitFrame(unit)
 		-- Manual
 		frame:SetParent(UIParent)
 		frame:ClearAllPoints()
-		
 		frame:SetSize(config.size, config.size)
-		frame.cooldownContainer:SetSize(frame:GetWidth(), frame:GetHeight())
-		
 		frame:SetFrameLevel(frame:GetParent():GetFrameLevel()+1)
-		frame.cooldownContainer:SetFrameLevel(frame:GetParent():GetFrameLevel())
-		frame.cooldownContainer:SetSize(frame:GetWidth(), frame:GetHeight())
 
 		if not self.db.profile.unitFrames[unit] then self.db.profile.unitFrames[unit] = {} end
 
@@ -858,6 +897,7 @@ function BigDebuffs:AttachUnitFrame(unit)
 			frame:SetPoint("CENTER", relativeFrame, "CENTER")
 		end
 		
+		frame:SetSize(config.size, config.size)
 	end
 
 end
@@ -901,7 +941,7 @@ end
 local function UnitDebuffTest(unit, index)
 	local debuff = TestDebuffs[index]
 	if not debuff then return end
-	return GetSpellInfo(debuff[1]), nil, debuff[2], 0, "Magic", 50, GetTime()+50, nil, nil, nil, debuff[1]
+	return "Test", nil, debuff[2], 0, debuff[4], 0, 0, nil, nil, nil, debuff[1]
 end
 
 function BigDebuffs:OnEnable()
@@ -915,7 +955,7 @@ function BigDebuffs:OnEnable()
 	self:PLAYER_TALENT_UPDATE()
 
 	-- Prevent OmniCC finish animations
-	if OmniCC then
+	if OmniCC and type(OmniCC) == 'table' and OmniCC.TriggerEffect then
 		self:RawHook(OmniCC, "TriggerEffect", function(object, cooldown)
 			local name = cooldown:GetName()
 			if name and name:find("BigDebuffs") then return end
@@ -929,6 +969,7 @@ function BigDebuffs:OnEnable()
 	InsertTestDebuff(114404, nil) -- Void Tendrils
 	InsertTestDebuff(589, "Magic") -- Shadow Word: Pain
 	InsertTestDebuff(772, nil) -- Rend
+
 end
 
 function BigDebuffs:PLAYER_ENTERING_WORLD()
@@ -938,11 +979,219 @@ function BigDebuffs:PLAYER_ENTERING_WORLD()
 	self.stances = {}
 end
 
--- For unit frames
-function BigDebuffs:GetAuraPriority(name, id)
-	if not self.Spells[id] and not self.Spells[name] then return end
+function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, ...)
+
+	-- SPELL_INTERRUPT doesn't fire for some channeled spells 
+	if event ~= "SPELL_INTERRUPT" and event ~= "SPELL_CAST_SUCCESS" then return end
+
+	local _,srcGUID,_,_,_, destGUID, _,_,_, spellId = ...
+	local spell = self.Spells[spellId]
+
+	if not spell or spell.type ~= "interrupts" then return end
+
+	-- Find unit
+	for i = 1, #unitsWithRaid do
+		local unit = unitsWithRaid[i]
+		if destGUID == UnitGUID(unit) and (event ~= "SPELL_CAST_SUCCESS" or select(8, UnitChannelInfo(unit)) == false) then
+			local duration = spell.duration
+			local _, class = UnitClass(unit)
+
+			--[[
+			if class == "PRIEST" or class == "SHAMAN" or class == "WARLOCK" then
+				duration = duration * 0.7
+			end
+
+			if UnitBuff(unit, "Burning Determination") or UnitBuff(unit, "Calming Waters") or UnitBuff(unit, "Casting Circle") then
+				duration = duration * 0.3
+			end
+]]
+			self.units[destGUID] = self.units[destGUID] or {}
+			self.units[destGUID].expires = GetTime() + duration
+			self.units[destGUID].spellId = spellId
+
+			-- Make sure we clear it after the duration
+			--C_Timer.After(duration, function()
+			LibStub("AceTimer-3.0"):ScheduleTimer(function() 
+				if self.AttachedFrames[unit] then
+                    self:ShowBigDebuffs(self.AttachedFrames[unit])
+                end
+
+                if not unit:match("^raid") then
+                    self:UNIT_AURA(unit)
+                end
+			end, duration + 0.05) -- adding slight delay for checking expiring timer
+
+			self:UNIT_AURA_ALL_UNITS()			
+
+			return
+
+		end
+	end
+end
+
+function BigDebuffs:UNIT_AURA_ALL_UNITS()
+	for i = 1, #unitsWithRaid do
+		local unit = unitsWithRaid[i]
+
+		if self.AttachedFrames[unit] then
+			self:ShowBigDebuffs(self.AttachedFrames[unit])
+		end
+
+		if not unit:match("^raid") then
+			self:UNIT_AURA(unit)
+		end
+	end
+end
+
+BigDebuffs.AttachedFrames = {}
+
+local MAX_BUFFS = 6
+
+function BigDebuffs:AddBigDebuffs(frame)
+	if not frame or not frame.displayedUnit or not UnitIsPlayer(frame.displayedUnit) then return end
+	local frameName = frame:GetName()
+	if self.db.profile.raidFrames.increaseBuffs then
+		for i = 4, MAX_BUFFS do
+			local buffPrefix = frameName .. "Buff"
+			local buffFrame = _G[buffPrefix .. i] or CreateFrame("Button", buffPrefix .. i, frame, "CompactBuffTemplate")
+			buffFrame:ClearAllPoints()
+			if math.fmod(i - 1, 3) == 0 then
+				buffFrame:SetPoint("BOTTOMRIGHT", _G[buffPrefix .. i - 3], "TOPRIGHT")
+			else
+				buffFrame:SetPoint("BOTTOMRIGHT", _G[buffPrefix .. i - 1], "BOTTOMLEFT")
+			end
+		end
+	end
+
+	self.AttachedFrames[frame.displayedUnit] = frame
+
+	frame.BigDebuffs = frame.BigDebuffs or {}
+	local max = self.db.profile.raidFrames.maxDebuffs + 1 -- add a frame for warning debuffs
+	for i = 1, max do
+		local big = frame.BigDebuffs[i] or
+			CreateFrame("Button", frameName .. "BigDebuffsRaid" .. i, frame, "CompactDebuffTemplate")
+		big:ClearAllPoints()
+		if i > 1 then
+			if self.db.profile.raidFrames.anchor == "INNER" then
+				big:SetPoint("BOTTOMLEFT", frame.BigDebuffs[i-1], "BOTTOMRIGHT", 0, 0)
+			elseif self.db.profile.raidFrames.anchor == "LEFT" then
+				big:SetPoint("BOTTOMRIGHT", frame.BigDebuffs[i-1], "BOTTOMLEFT", 0, 0)
+			elseif self.db.profile.raidFrames.anchor == "RIGHT" then
+				big:SetPoint("BOTTOMLEFT", frame.BigDebuffs[i-1], "BOTTOMRIGHT", 0, 0)
+			end
+		else
+			if self.db.profile.raidFrames.anchor == "INNER" then
+				big:SetPoint("BOTTOMLEFT", frame.debuffFrames[1], "BOTTOMLEFT", 0, 0)
+			elseif self.db.profile.raidFrames.anchor == "LEFT" then
+				big:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 1)
+			elseif self.db.profile.raidFrames.anchor == "RIGHT" then
+				big:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 1)
+			end
+		end
+
+		--local start, duration, enable, charges, maxCharges = GetActionCooldown(self.action);
+		--CooldownFrame_SetTimer(self.cooldown, start, duration, enable, charges, maxCharges);
+		--big.cooldown:SetHideCountdownNumbers(not self.db.profile.raidFrames.cooldownCount)
+		big.cooldown.noCooldownCount = not self.db.profile.raidFrames.cooldownCount
+
+		--big.cooldown:SetDrawEdge(false)
+		frame.BigDebuffs[i] = big
+		big:Hide()
+		self.frames[frame] = true
+		self:ShowBigDebuffs(frame)
+	end
+	return true
+end
+
+
+hooksecurefunc("CompactUnitFrame_UpdateAll", function(frame)
+	if frame:IsForbidden() then return end
+	local name = frame:GetName()
+	if not name or not name:match("^Compact") then return end
+	if InCombatLockdown() and not frame.BigDebuffs then
+		if not pending[frame] then pending[frame] = true end
+	else
+		BigDebuffs:AddBigDebuffs(frame)
+	end
+end)
+
+
+function BigDebuffs:PLAYER_TALENT_UPDATE()
+	local specID = GetSpecializationInfo(GetSpecialization() or 1)
+	self.specDispel = specID and specDispel[specID] and specDispel[specID]
+end
+
+local pending = {}
+
+function BigDebuffs:PLAYER_REGEN_ENABLED()
+	for frame,_ in pairs(pending) do
+		BigDebuffs:AddBigDebuffs(frame)
+		pending[frame] = nil
+	end
+end
+
+local function IsPriorityDebuff(id)
+	for i = 1, #BigDebuffs.PriorityDebuffs do
+		if id == BigDebuffs.PriorityDebuffs[i] then
+			return true
+		end
+	end
+end
+
+hooksecurefunc("CompactUnitFrame_HideAllDebuffs", HideBigDebuffs)
+
+function BigDebuffs:IsDispellable(dispelType)
+	if not dispelType or not self.specDispel then return end
+	if type(self.specDispel[dispelType]) == "function" then return self.specDispel[dispelType]() end
+	return self.specDispel[dispelType]
+end
+
+function BigDebuffs:GetDebuffSize(id, dispellable)
+	if self.db.profile.raidFrames.pve > 0 then
+		local _, instanceType = IsInInstance()
+		if dispellable and instanceType and (instanceType == "raid" or instanceType == "party") then
+			return self.db.profile.raidFrames.pve
+		end
+	end
 	
-	id = self.Spells[id] and id or name
+	if not self.Spells[id] then return end
+	id = self.Spells[id].parent or id -- Check for parent spellID
+
+	local category = self.Spells[id].type
+
+	if not category or not self.db.profile.raidFrames[category] then return end
+
+	-- Check for user set
+	if self.db.profile.spells[id] then
+		if self.db.profile.spells[id].raidFrames and self.db.profile.spells[id].raidFrames == 0 then return end
+		if self.db.profile.spells[id].size then return self.db.profile.spells[id].size end
+	end
+
+	if self.Spells[id].noraidFrames and (not self.db.profile.spells[id] or not self.db.profile.spells[id].raidFrames) then
+		return
+	end
+
+	local dispellableSize = self.db.profile.raidFrames.dispellable[category]
+	if dispellable and dispellableSize and dispellableSize > 0 then return dispellableSize end
+
+	if self.db.profile.raidFrames[category] > 0 then
+		return self.db.profile.raidFrames[category]
+	end
+end
+
+-- For raid frames
+function BigDebuffs:GetDebuffPriority(id)
+	if not self.Spells[id] then return 0 end
+	id = self.Spells[id].parent or id -- Check for parent spellID
+	
+	return self.db.profile.spells[id] and self.db.profile.spells[id].priority or
+		self.db.profile.priority[self.Spells[id].type] or 0
+end
+
+-- For unit frames
+function BigDebuffs:GetAuraPriority(id)
+	if not self.Spells[id] then return end
+	id = self.Spells[id].parent or id -- Check for parent spellID
 	
 	-- Make sure category is enabled
 	if not self.db.profile.unitFrames[self.Spells[id].type] then return end
@@ -960,59 +1209,25 @@ function BigDebuffs:GetAuraPriority(name, id)
 	return self.db.profile.priority[self.Spells[id].type] or 0
 end
 
-function BigDebuffs:GetUnitFromGUID(guid)
-	for _,unit in pairs(units) do
-		if UnitGUID(unit) == guid then
-			return unit
-		end
-	end
-	return nil
-end
-
-function BigDebuffs:UNIT_SPELLCAST_FAILED(_,unit, _, _, spellid)
-	local guid = UnitGUID(unit)
-	if self.interrupts[guid] == nil then
-		self.interrupts[guid] = {}
-		BigDebuffs:CancelTimer(self.interrupts[guid].timer)
-		self.interrupts[guid].timer = BigDebuffs:ScheduleTimer(self.ClearInterruptGUID, 30, self, guid)
-	end
-	self.interrupts[guid].failed = GetTime()
-end
-
-function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, ...)
-	local _, subEvent, sourceGUID, _, _, destGUID, destName, _, spellid, name = ...
-
-	if subEvent == "SPELL_CAST_SUCCESS" and self.Spells[spellid] then
-		if spellid == 2457 or spellid == 2458 or spellid == 71 then
-			self:UpdateStance(sourceGUID, spellid)
-		end
-	end
-
-	if subEvent ~= "SPELL_CAST_SUCCESS" and subEvent ~= "SPELL_INTERRUPT" then
-		return
-	end
-		
-	-- UnitChannelingInfo and event orders are not the same in WotLK as later expansions, UnitChannelingInfo will always return
-	-- nil @ the time of this event (independent of whether something was kicked or not).
-	-- We have to track UNIT_SPELLCAST_FAILED for spell failure of the target at the (approx.) same time as we interrupted
-	-- this "could" be wrong if the interrupt misses with a <0.01 sec failure window (which depending on server tickrate might
-	-- not even be possible)
-	if subEvent == "SPELL_CAST_SUCCESS" and not (self.interrupts[destGUID] and 
-			self.interrupts[destGUID].failed and GetTime() - self.interrupts[destGUID].failed < 0.01) then
-		return
-	end
-	
-	local spelldata = self.Spells[name] and self.Spells[name] or self.Spells[spellid]
-	if spelldata == nil or spelldata.type ~= "interrupts" then return end
-	local duration = spelldata.interruptduration
-   	if not duration then return end
-	
-	self:UpdateInterrupt(nil, destGUID, spellid, duration)
-end
-
 function BigDebuffs:UpdateStance(guid, spellid)
 	if self.stances[guid] == nil then
 		self.stances[guid] = {}
+-- Copy this function to check for testing mode
+local function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter, isBossAura, isBossBuff, test)
+	local UnitDebuff = test and UnitDebuffTest or UnitDebuff
+	-- make sure you are using the correct index here!
+	--isBossAura says make this look large.
+	--isBossBuff looks in HELPFULL auras otherwise it looks in HARMFULL ones
+	local name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId;
+
+	if index == -1 then
+		-- it's an interrupt
+		local spell = BigDebuffs.units[UnitGUID(unit)]
+		spellId = spell.spellId
+		icon = GetSpellTexture(spellId)
+		count = 1
+		duration = BigDebuffs.Spells[spellId].duration
+		expirationTime = spell.expires
 	else
 		self:CancelTimer(self.stances[guid].timer)
 	end
@@ -1023,148 +1238,313 @@ function BigDebuffs:UpdateStance(guid, spellid)
 	local unit = self:GetUnitFromGUID(guid)
 	if unit then
 		self:UNIT_AURA(nil, unit)
+	debuffFrame.filter = filter;
+	debuffFrame.icon:SetTexture(icon);
+	if ( count > 1 ) then
+		local countText = count;
+		if ( count >= 10 ) then
+			countText = BUFF_STACKS_OVERFLOW;
+		end
+		debuffFrame.count:Show();
+		debuffFrame.count:SetText(countText);
+	else
+		debuffFrame.count:Hide();
 	end
-end
+	debuffFrame:SetID(index);
+	if ( expirationTime and expirationTime ~= 0 ) then
+		local startTime = expirationTime - duration;
+		debuffFrame.cooldown:SetCooldown(startTime, duration);
+		debuffFrame.cooldown:Show();
+	else
+		debuffFrame.cooldown:Hide();
+	end
+
+	local color = DebuffTypeColor[debuffType] or DebuffTypeColor["none"];
+	debuffFrame.border:SetVertexColor(color.r, color.g, color.b);
 
 function BigDebuffs:ClearStanceGUID(guid)
 	local unit = self:GetUnitFromGUID(guid)
 	if unit == nil then
 		self.stances[guid] = nil
+	debuffFrame.isBossBuff = isBossBuff;
+	if ( isBossAura ) then
+		debuffFrame:SetSize(debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE, debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE);
 	else
 		self.stances[guid].timer = BigDebuffs:ScheduleTimer(self.ClearStanceGUID, 180, self, guid)
+		debuffFrame:SetSize(debuffFrame.baseSize, debuffFrame.baseSize);
 	end
+
+	debuffFrame:Show();
 end
 
-function BigDebuffs:UpdateInterrupt(unit, guid, spellid, duration)
-	local t = GetTime()
-	-- new interrupt
-	if spellid and duration ~= nil then
-		if self.interrupts[guid] == nil then self.interrupts[guid] = {} end
-		BigDebuffs:CancelTimer(self.interrupts[guid].timer)
-		self.interrupts[guid].timer = BigDebuffs:ScheduleTimer(self.ClearInterruptGUID, 30, self, guid)
-		self.interrupts[guid][spellid] = {started = t, duration = duration}
-	-- old interrupt expiring
-	elseif spellid and duration == nil then
-		if self.interrupts[guid] and self.interrupts[guid][spellid] and
-				t > self.interrupts[guid][spellid].started + self.interrupts[guid][spellid].duration then
-			self.interrupts[guid][spellid] = nil
-		end
-	end
-	
-	if unit == nil then
-		unit = self:GetUnitFromGUID(guid)
-	end
-	
-	if unit then	
-		self:UNIT_AURA(nil, unit)
-	end
-	-- clears the interrupt after end of duration
-	if duration then
-		BigDebuffs:ScheduleTimer(self.UpdateInterrupt, duration+0.1, self, unit, guid, spellid)
-	end
-end
+function BigDebuffs:ShowBigDebuffs(frame)
 
-function BigDebuffs:ClearInterruptGUID(guid)
-	self.interrupts[guid] = nil
-end
+	if not self.db.profile.raidFrames.enabled or not frame.debuffFrames or not frame.BigDebuffs then return end
 
-function BigDebuffs:GetInterruptFor(unit)
-	local guid = UnitGUID(unit)
-	interrupts = self.interrupts[guid]
-	if interrupts == nil then return end
-	
-	local name, spellid, icon, duration, endsAt
-	
-	-- iterate over all interrupt spellids to find the one of highest duration
-	for ispellid, intdata in pairs(interrupts) do
-		if type(ispellid) == "number" then
-			local tmpstartedAt = intdata.started
-			local dur = intdata.duration
-			local tmpendsAt = tmpstartedAt + dur
-			if GetTime() > tmpendsAt then
-				self.interrupts[guid][ispellid] = nil
-			elseif endsAt == nil or tmpendsAt > endsAt then
-				endsAt = tmpendsAt
-				duration = dur
-				name, _, icon = GetSpellInfo(ispellid)
-				spellid = ispellid
-			end
-		end
-	end
-	
-	if name then
-		return name, spellid, icon, duration, endsAt
-	end
-end
+	if not UnitIsPlayer(frame.displayedUnit) then
+		return
+	end	
 
-function BigDebuffs:UNIT_AURA(event, unit)
-	if not self.db.profile.unitFrames[unit:gsub("%d", "")] or 
-			not self.db.profile.unitFrames[unit:gsub("%d", "")].enabled then 
-		return 
-	end
-	--self:AttachUnitFrame(unit)
-	
-	local frame = self.UnitFrames[unit]
-	if not frame then return end
-	
-	local UnitDebuff = BigDebuffs.test and UnitDebuffTest or UnitDebuff
-	
+	local UnitDebuff = self.test and UnitDebuffTest or UnitDebuff
+
+	HideBigDebuffs(frame)
+
+	local debuffs = {}
+	local big
 	local now = GetTime()
-	local left, priority, duration, expires, icon, isAura, interrupt = 0, 0
-	
+	local warning, warningId
+
 	for i = 1, 40 do
-		-- Check debuffs
-		local n,_, ico, _,_, d, e, caster, _,_, id = UnitDebuff(unit, i)
-		
+		local _,_,_,_, dispelType, _, time, caster, _,_, id = UnitDebuff(frame.displayedUnit, i)
 		if id then
-			if self.Spells[n] or self.Spells[id] then
-				local p = self:GetAuraPriority(n, id)
-				if p and (p > priority or (p == prio and expires and e < expires)) then
-					left = e - now
-					duration = d
-					isAura = true
-					priority = p
-					expires = e
-					icon = ico
+			local reaction = caster and UnitReaction("player", caster) or 0
+			local friendlySmokeBomb = id == 88611 and reaction > 4
+			local size = self:GetDebuffSize(id, self:IsDispellable(dispelType))
+			if size and not friendlySmokeBomb then
+				big = true
+				local duration = time and time - now or 0
+				tinsert(debuffs, { i, size, duration, self:GetDebuffPriority(id) })
+			elseif self.db.profile.raidFrames.redirectBliz or
+			(self.db.profile.raidFrames.anchor == "INNER" and not self.db.profile.raidFrames.hideBliz) then
+				if not frame.optionTable.displayOnlyDispellableDebuffs or self:IsDispellable(dispelType) then
+					tinsert(debuffs, { i, self.db.profile.raidFrames.default, 0, 0 }) -- duration 0 to preserve Blizzard order
 				end
 			end
-		else
-			break
+
+			-- Set warning debuff
+			local k
+			for j = 1, #self.WarningDebuffs do
+				if id == self.WarningDebuffs[j] and
+				self.db.profile.raidFrames.warningList[id] and
+				not friendlySmokeBomb and
+				(not k or j < k) then
+					k = j
+					warning = i
+					warningId = id
+				end
+			end
 		end
 	end
+
+	-- check for interrupts
+	local guid = UnitGUID(frame.displayedUnit)
+	if guid and self.units[guid] and self.units[guid].expires and self.units[guid].expires > GetTime() then
+		local spellId = self.units[guid].spellId
+		local size = self:GetDebuffSize(spellId, false)
+		if size then
+			big = true
+			tinsert(debuffs, { -1, size, 0, self:GetDebuffPriority(id) })
+		end
+	end
+
+	if #debuffs > 0 then
+		-- insert the warning debuff if it exists and we have a big debuff
+		if big and warning then
+			local size = self.db.profile.raidFrames.warning
+			-- remove duplicate
+			for k,v in pairs(debuffs) do
+				if v[1] == warning then
+					if self.Spells[warningId] then size = v[2] end -- preserve the size
+					table.remove(debuffs, k)
+					break
+				end
+			end
+			tinsert(debuffs, { warning, size, 0, 0, true })
+		else
+			warning = nil
+		end
+
+		-- sort by priority > size > duration > index
+		table.sort(debuffs, function(a, b)
+			if a[4] == b[4] then
+				if a[2] == b[2] then
+					if a[3] < b[3] then return true end
+					if a[3] == b[3] then return a[1] < b[1] end
+				end
+				return a[2] > b[2]
+			end
+			return a[4] > b[4]
+		end)
+
+		local index = 1
+
+		if self.db.profile.raidFrames.hideBliz or
+		self.db.profile.raidFrames.anchor == "INNER" or
+		self.db.profile.raidFrames.redirectBliz then
+			CompactUnitFrame_HideAllDebuffs(frame)
+		end
+
+		for i = 1, #debuffs do			
+			if index <= self.db.profile.raidFrames.maxDebuffs or debuffs[i][1] == warning then
+				if not frame.BigDebuffs[index] then break end
+				frame.BigDebuffs[index].baseSize = frame:GetHeight() * debuffs[i][2] * 0.01
+				CompactUnitFrame_UtilSetDebuff(frame.BigDebuffs[index], frame.displayedUnit, debuffs[i][1], nil, false, false, self.test)
+				--frame.BigDebuffs[index].cooldown:SetSwipeColor(0, 0, 0, 0.7)
+				index = index + 1
+			end
+		end
+
+	end
+
+end
+
+-- We need to copy the entire function to avoid taint
+hooksecurefunc("CompactUnitFrame_UpdateDebuffs", function(frame)
+	if not UnitIsPlayer(frame.displayedUnit) then
+		return
+	end	
+
+	if ( not frame.optionTable.displayDebuffs ) then
+		CompactUnitFrame_HideAllDebuffs(frame);
+		return;
+	end
+	local test = BigDebuffs.test
+	local UnitDebuff = test and UnitDebuffTest or UnitDebuff
+	local index = 1;
+	local frameNum = 1;
+	local filter = nil;
+	local maxDebuffs = frame.maxDebuffs;
+	--Show both Boss buffs & debuffs in the debuff location
+	--First, we go through all the debuffs looking for any boss flagged ones.
+	while ( frameNum <= maxDebuffs ) do
+		local debuffName = UnitDebuff(frame.displayedUnit, index, filter);
+		if ( debuffName ) then
+			if ( CompactUnitFrame_UtilIsBossAura(frame.displayedUnit, index, filter, false) ) then
+				local debuffFrame = frame.debuffFrames[frameNum];
+				CompactUnitFrame_UtilSetDebuff(debuffFrame, frame.displayedUnit, index, filter, true, false, test);
+				frameNum = frameNum + 1;
+				--Boss debuffs are about twice as big as normal debuffs, so display one less.
+				local bossDebuffScale = (debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE)/debuffFrame.baseSize
+				maxDebuffs = maxDebuffs - (bossDebuffScale - 1);
+			end
+		else
+			break;
+		end
+		index = index + 1;
+	end
+	--Then we go through all the buffs looking for any boss flagged ones.
+	index = 1;
+	while ( frameNum <= maxDebuffs ) do
+		local debuffName = UnitBuff(frame.displayedUnit, index, filter);
+		if ( debuffName ) then
+			if ( CompactUnitFrame_UtilIsBossAura(frame.displayedUnit, index, filter, true) ) then
+				local debuffFrame = frame.debuffFrames[frameNum];
+				CompactUnitFrame_UtilSetDebuff(debuffFrame, frame.displayedUnit, index, filter, true, true, test);
+				frameNum = frameNum + 1;
+				--Boss debuffs are about twice as big as normal debuffs, so display one less.
+				local bossDebuffScale = (debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE)/debuffFrame.baseSize
+				maxDebuffs = maxDebuffs - (bossDebuffScale - 1);
+			end
+		else
+			break;
+		end
+		index = index + 1;
+	end
 	
+	--Now we go through the debuffs with a priority (e.g. Weakened Soul and Forbearance)
+	index = 1;
+	while ( frameNum <= maxDebuffs ) do
+		local debuffName, _,_,_,_,_,_,_,_,_, id = UnitDebuff(frame.displayedUnit, index, filter);
+		if ( debuffName ) then
+			if ( CompactUnitFrame_UtilIsPriorityDebuff(frame.displayedUnit, index, filter) or IsPriorityDebuff(id)) then
+				local debuffFrame = frame.debuffFrames[frameNum];
+				CompactUnitFrame_UtilSetDebuff(debuffFrame, frame.displayedUnit, index, filter, false, false, test);
+				frameNum = frameNum + 1;
+			end
+		else
+			break;
+		end
+		index = index + 1;
+	end
+	
+	if ( frame.optionTable.displayOnlyDispellableDebuffs ) then
+		filter = "RAID";
+	end
+	
+	index = 1;
+	--Now, we display all normal debuffs.
+	if ( frame.optionTable.displayNonBossDebuffs ) then
+	while ( frameNum <= maxDebuffs ) do
+		local debuffName, _,_,_,_,_,_,_,_,_, id = UnitDebuff(frame.displayedUnit, index, filter);
+		if ( debuffName ) then
+			if BigDebuffs.test or (( CompactUnitFrame_UtilShouldDisplayDebuff(frame.displayedUnit, index, filter) and not CompactUnitFrame_UtilIsBossAura(frame.displayedUnit, index, filter, false) and
+				not CompactUnitFrame_UtilIsPriorityDebuff(frame.displayedUnit, index, filter) and not IsPriorityDebuff(id))) then
+				local debuffFrame = frame.debuffFrames[frameNum];
+				CompactUnitFrame_UtilSetDebuff(debuffFrame, frame.displayedUnit, index, filter, false, false, test);
+				frameNum = frameNum + 1;
+			end
+		else
+			break;
+		end
+		index = index + 1;
+	end
+	end
+	
+	for i=frameNum, frame.maxDebuffs do
+		local debuffFrame = frame.debuffFrames[i];
+		debuffFrame:Hide();
+	end
+
+	BigDebuffs:ShowBigDebuffs(frame)
+end)
+
+function BigDebuffs:IsPriorityBigDebuff(id)
+	if not self.Spells[id] then return end
+	id = self.Spells[id].parent or id -- Check for parent spellID
+	return self.Spells[id].priority
+end
+
+function BigDebuffs:UNIT_AURA(unit)
+	if not self.db.profile.unitFrames.enabled or not self.db.profile.unitFrames[unit:gsub("%d", "")].enabled then return end
+
+	self:AttachUnitFrame(unit)
+
+	local frame = self.UnitFrames[unit]
+	if not frame then return end
+
+	local UnitDebuff = BigDebuffs.test and UnitDebuffTest or UnitDebuff
+
+	local now = GetTime()
+	local left, priority, duration, expires, icon, debuff, buff, interrupt = 0, 0
+
 	for i = 1, 40 do
-		-- Check buffs
-		local n,_, ico, _,_, d, e, _,_,_, id = UnitBuff(unit, i)
+		-- Check debuffs
+		local _,_, n, _,_, d, e, caster, _,_, id = UnitDebuff(unit, i)
 		if id then
 			if self.Spells[id] then
-				local p = self:GetAuraPriority(n, id)
-				if p and p >= priority then
-					if p and (p > priority or (p == prio and expires and e < expires)) then
+				local reaction = caster and UnitReaction("player", caster) or 0
+				local friendlySmokeBomb = id == 88611 and reaction > 4
+				local p = self:GetAuraPriority(id)
+				if p and p >= priority and not friendlySmokeBomb then
+					if p > priority or self:IsPriorityBigDebuff(id) or e == 0 or e - now > left then
 						left = e - now
 						duration = d
-						isAura = true
+						debuff = i
 						priority = p
 						expires = e
-						icon = ico
+						icon = id == 137143 and"Interface\\AddOns\\".. addonName .."\\bloodhorror2"or n
 					end
 				end
 			end
-		else
-			break
 		end
-	end
-	
-	local n, id, ico, d, e = self:GetInterruptFor(unit)
-	if n then
-		local p = self:GetAuraPriority(n, id)
-		if p and (p > priority or (p == prio and expires and e < expires)) then
-			left = e - now
-			duration = d
-			isAura = true
-			priority = p
-			expires = e
-			icon = ico
+
+		-- Check buffs
+		local _,_, n, _,_, d, e, _,_,_, id = UnitBuff(unit, i)
+		if id then
+			if self.Spells[id] then
+				local p = self:GetAuraPriority(id)
+				if p and p >= priority then
+					if p > priority or self:IsPriorityBigDebuff(id) or e == 0 or e - now > left then
+						left = e - now
+						duration = d
+						debuff = i
+						priority = p
+						expires = e
+						icon = n
+						buff = true
+					end
+				end
+			end
 		end
 	end
 
@@ -1187,11 +1567,15 @@ function BigDebuffs:UNIT_AURA(event, unit)
 		end
 	end
 	
-	if isAura then
+
+	if debuff then
+		if duration < 1 then duration = 1 end -- auras like Solar Beam don't have a duration
+
 		if frame.current ~= icon then
 			if frame.blizzard then
 				-- Blizzard Frame
 				SetPortraitToTexture(frame.icon, icon)
+
 				-- Adapt
 				if frame.anchor and Adapt and Adapt.portraits[frame.anchor] then
 					Adapt.portraits[frame.anchor].modelLayer:SetFrameStrata("BACKGROUND")
@@ -1201,38 +1585,74 @@ function BigDebuffs:UNIT_AURA(event, unit)
 			end
 		end
 		
-		if duration >= 1 then
-			frame.cooldown:SetCooldown(expires - duration, duration)
-			frame.cooldownContainer:Show()
-		else 
-			frame.cooldown:SetCooldown(0, 0)
-			frame.cooldownContainer:Hide()
-		end
-
+		frame.cooldown:SetCooldown(expires - duration, duration)
 		frame:Show()
+		--frame.cooldown:SetSwipeColor(0, 0, 0, 0.6)
+
+		-- set for tooltips
+		frame:SetID(debuff)
+		frame.buff = buff
+		frame.interrupt = interrupt
 		frame.current = icon
 	else
 		-- Adapt
 		if frame.anchor and frame.blizzard and Adapt and Adapt.portraits[frame.anchor] then
 			Adapt.portraits[frame.anchor].modelLayer:SetFrameStrata("LOW")
-		else
-			frame:Hide()
-			frame.current = nil
 		end
+
+		frame:Hide()
+		frame.current = nil
 	end
 end
 
 function BigDebuffs:PLAYER_FOCUS_CHANGED()
-	self:UNIT_AURA(nil, "focus")
+	self:UNIT_AURA("focus")
 end
 
 function BigDebuffs:PLAYER_TARGET_CHANGED()
-	self:UNIT_AURA(nil, "target")
+	self:UNIT_AURA("target")
 end
 
 function BigDebuffs:UNIT_PET()
-	self:UNIT_AURA(nil, "pet")
+	self:UNIT_AURA("pet")
 end
+
+-- Show extra buffs
+-- Setting frame.maxBuffs causes taint, so we need to copy entire function (FrameXML/CompactUnitFrame.lua)
+hooksecurefunc("CompactUnitFrame_UpdateBuffs", function(frame)
+
+	if not UnitIsPlayer(frame.displayedUnit) then
+		return
+	end	
+	
+	if not BigDebuffs.db.profile.raidFrames.increaseBuffs then return end
+
+	if ( not frame.optionTable.displayBuffs ) then
+		CompactUnitFrame_HideAllBuffs(frame);
+		return;
+	end
+	
+	local index = 1;
+	local frameNum = 1;
+	local filter = nil;
+	while ( frameNum <= MAX_BUFFS ) do
+		local buffName = UnitBuff(frame.displayedUnit, index, filter);
+		if ( buffName ) then
+			if ( CompactUnitFrame_UtilShouldDisplayBuff(frame.displayedUnit, index, filter) and not CompactUnitFrame_UtilIsBossAura(frame.displayedUnit, index, filter, true) ) then
+				local buffFrame = frame.buffFrames[frameNum];
+				CompactUnitFrame_UtilSetBuff(buffFrame, frame.displayedUnit, index, filter);
+				frameNum = frameNum + 1;
+			end
+		else
+			break;
+		end
+		index = index + 1;
+	end
+	for i=frameNum, MAX_BUFFS do
+		local buffFrame = frame.buffFrames[i];
+		if buffFrame then buffFrame:Hide() end
+	end
+end)
 
 SLASH_BigDebuffs1 = "/bd"
 SLASH_BigDebuffs2 = "/bigdebuffs"
