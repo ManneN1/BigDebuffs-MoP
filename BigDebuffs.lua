@@ -143,9 +143,6 @@ BigDebuffs.Spells = {
 	[147362] = { type = "interrupts", duration = 3 }, -- Counter Shot (Hunter)
 	[31935] = { type = "interrupts", duration = 3 }, -- Avengers Shield (Paladin)
 
-	-- TEST
-	[774] = { type = "cc" }, -- Rejuvenation 
-	
 	-- Death Knight
 
 	[47476] = { type = "cc" }, -- Strangulate 
