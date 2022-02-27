@@ -1,7 +1,8 @@
-local addonName = ...
 
 -- BigDebuffs by Jordon 
 -- Backported and general improvements by Konjunktur
+
+local addonName, addon = ...
 
 BigDebuffs = LibStub("AceAddon-3.0"):NewAddon("BigDebuffs", "AceEvent-3.0", "AceHook-3.0", "AceTimer-3.0")
 
@@ -1020,7 +1021,7 @@ function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, _, subEvent, ...)
 
 			-- Make sure we clear it after the duration
 			--C_Timer.After(duration, function()
-			self:ScheduleTimer(self:UNIT_AURA_ALL_UNITS(), duration + 0.05, self) -- adding slight delay for checking expiring timer
+			self:ScheduleTimer(self.UNIT_AURA_ALL_UNITS, duration + 0.05, self) -- adding slight delay for checking expiring timer
 
 			-- This works 99% but I havn't tested it, it's to stop the AddOn from consuming memory in long sessions
 			--[[ 
@@ -1532,7 +1533,7 @@ function BigDebuffs:IsPriorityBigDebuff(id)
 end
 
 function BigDebuffs:UNIT_AURA(event, unit)
-	if not self.db.profile.unitFrames.enabled or not self.db.profile.unitFrames[unit:gsub("%d", "")].enabled then return end
+	if not self.db.profile.unitFrames.enabled or not self.db.profile.unitFrames[unit:gsub("%d", "")] or not self.db.profile.unitFrames[unit:gsub("%d", "")].enabled then return end
 
 	self:AttachUnitFrame(unit)
 
