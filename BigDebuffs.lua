@@ -143,6 +143,9 @@ BigDebuffs.Spells = {
 	[147362] = { type = "interrupts", duration = 3 }, -- Counter Shot (Hunter)
 	[31935] = { type = "interrupts", duration = 3 }, -- Avengers Shield (Paladin)
 
+	-- TEST
+	[774] = { type = "cc" }, -- Rejuvenation 
+	
 	-- Death Knight
 
 	[47476] = { type = "cc" }, -- Strangulate 
@@ -196,9 +199,9 @@ BigDebuffs.Spells = {
 	[106922] = { type = "buffs_defensive" }, -- Might of Ursoc
 	[132402] = { type = "buffs_defensive" }, -- Savage Defense
 	[108291] = { type = "buffs_defensive" }, -- Heart of the Wild
-	[108292] = { type = "buffs_defensive" }, -- Heart of the Wild
-	[108293] = { type = "buffs_defensive" }, -- Heart of the Wild
-	[108294] = { type = "buffs_defensive" }, -- Heart of the Wild
+		[108292] = { type = "buffs_defensive", parent = 108292, }, -- Heart of the Wild
+		[108293] = { type = "buffs_defensive", parent = 108292, }, -- Heart of the Wild
+		[108294] = { type = "buffs_defensive", parent = 108292, }, -- Heart of the Wild
 	[132158] = { type = "buffs_defensive" }, -- Nature's Swiftness
 
 	[113072] = { type = "buffs_defensive" }, -- Symbiosis: Might of Ursoc
@@ -507,6 +510,9 @@ BigDebuffs.Spells = {
 	[46924] = { type = "immunities" }, -- Bladestorm
 	[676] = { type = "cc" }, -- Disarm
 	[18498] = { type = "cc" }, -- Silenced - Gag Order (PvE only)
+	[2457] = { type = "buffs_other" }, -- Battle Stance
+	[2458] = { type = "buffs_other" }, -- Berserker Stance
+	[71] = { type = "buffs_other" }, -- Defensive Stance
 
 	-- Other
 
@@ -691,7 +697,7 @@ local GetAnchor = {
 
 local anchors = {
 	["ElvUI"] = {
-		noPortait = true,
+		noPortrait = true,
 		units = {
 			player = "ElvUF_Player",
 			pet = "ElvUF_Pet",
@@ -791,7 +797,9 @@ function BigDebuffs:Refresh()
 		--frame.cooldown:SetHideCountdownNumbers(not self.db.profile.unitFrames.cooldownCount)
 		frame.cooldown.noCooldownCount = not self.db.profile.unitFrames.cooldownCount
 		self:AttachUnitFrame(unit)
-		self:UNIT_AURA(nil, unit)
+		if UnitExists(unit) then
+			self:UNIT_AURA(nil, unit)
+		end
 	end
 end
 
@@ -803,10 +811,15 @@ function BigDebuffs:AttachUnitFrame(unit)
 
 	if not frame then
 		frame = CreateFrame("Button", frameName, UIParent, "BigDebuffsUnitFrameTemplate")
+		frame.icon = _G[frameName.."Icon"]
+		frame.cooldownContainer = CreateFrame("Button", frameName.."CooldownContainer", frame)
 		self.UnitFrames[unit] = frame
-		frame:SetScript("OnEvent", function() self:UNIT_AURA(unit) end)
 		frame.icon:SetDrawLayer("BORDER")
-		frame:RegisterUnitEvent("UNIT_AURA", unit)
+		frame.cooldownContainer:SetPoint("CENTER")
+		frame.cooldown:SetParent(frame.cooldownContainer)
+		frame.cooldown:SetAllPoints()
+		frame.cooldown:SetAlpha(0.9)
+		
 		frame:RegisterForDrag("LeftButton")
 		frame:SetMovable(true)
 		frame.unit = unit
@@ -848,8 +861,8 @@ function BigDebuffs:AttachUnitFrame(unit)
 			-- Blizzard Frame
 			frame:SetParent(frame.anchor:GetParent())
 			frame:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel())
+			frame.cooldownContainer:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel()-1)
 			frame.cooldownContainer:SetSize(frame.anchor:GetWidth() - config.cdMod, frame.anchor:GetHeight() - config.cdMod)
-			frame.cooldown:SetFrameLevel(frame.anchor:GetParent():GetFrameLevel())
 			frame.anchor:SetDrawLayer("BACKGROUND")
             --frame.cooldown:SetMask("Interface\\CHARACTERFRAME\\TempPortraitAlphaMaskSmall")
 			--frame.cooldown:SetSwipeTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMaskSmall")
@@ -877,6 +890,12 @@ function BigDebuffs:AttachUnitFrame(unit)
 		-- Manual
 		frame:SetParent(UIParent)
 		frame:ClearAllPoints()
+		
+		frame.cooldownContainer:SetSize(frame:GetWidth(), frame:GetHeight())
+		
+		frame:SetFrameLevel(frame:GetParent():GetFrameLevel()+1)
+		frame.cooldownContainer:SetFrameLevel(frame:GetParent():GetFrameLevel())
+		frame.cooldownContainer:SetSize(frame:GetWidth(), frame:GetHeight())
 
 		if not self.db.profile.unitFrames[unit] then self.db.profile.unitFrames[unit] = {} end
 
@@ -931,9 +950,10 @@ local function InsertTestDebuff(spellID, dispelType)
 end
 
 local function UnitDebuffTest(unit, index)
+	index = math.random(1, #TestDebuffs)
 	local debuff = TestDebuffs[index]
 	if not debuff then return end
-	return "Test", nil, debuff[2], 0, debuff[4], 0, 0, nil, nil, nil, debuff[1]
+	return "Test", nil, debuff[2], 0, debuff[4], 60, GetTime() + 60, nil, nil, nil, debuff[1]
 end
 
 function BigDebuffs:OnEnable()
@@ -944,6 +964,7 @@ function BigDebuffs:OnEnable()
 	self:RegisterEvent("UNIT_PET")
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+	self:RegisterEvent("UNIT_AURA")
 	self:PLAYER_TALENT_UPDATE()
 
 	-- Prevent OmniCC finish animations
@@ -956,8 +977,8 @@ function BigDebuffs:OnEnable()
 	end
 
 	InsertTestDebuff(8122, "Magic") -- Psychic Scream
-	InsertTestDebuff(408, nil) -- Kidney Shot
 	InsertTestDebuff(339, "Magic") -- Entangling Roots
+	InsertTestDebuff(408, nil) -- Kidney Shot
 	InsertTestDebuff(114404, nil) -- Void Tendrils
 	InsertTestDebuff(589, "Magic") -- Shadow Word: Pain
 	InsertTestDebuff(772, nil) -- Rend
@@ -971,12 +992,18 @@ function BigDebuffs:PLAYER_ENTERING_WORLD()
 	self.stances = {}
 end
 
-function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, ...)
-
-	-- SPELL_INTERRUPT doesn't fire for some channeled spells 
-	if event ~= "SPELL_INTERRUPT" and event ~= "SPELL_CAST_SUCCESS" then return end
+function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, _, subEvent, ...)
 
 	local _,srcGUID,_,_,_, destGUID, _,_,_, spellId = ...
+	if subEvent == "SPELL_CAST_SUCCESS" and self.Spells[spellId] then
+		if spellId == 2457 or spellId == 2458 or spellId == 71 then
+			self:UpdateStance(srcGUID, spellId)
+		end
+	end
+
+	-- SPELL_INTERRUPT doesn't fire for some channeled spells 
+	if subEvent ~= "SPELL_INTERRUPT" and subEvent ~= "SPELL_CAST_SUCCESS" then return end
+
 	local spell = self.Spells[spellId]
 
 	if not spell or spell.type ~= "interrupts" then return end
@@ -984,34 +1011,28 @@ function BigDebuffs:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, ...)
 	-- Find unit
 	for i = 1, #unitsWithRaid do
 		local unit = unitsWithRaid[i]
-		if destGUID == UnitGUID(unit) and (event ~= "SPELL_CAST_SUCCESS" or select(8, UnitChannelInfo(unit)) == false) then
+		if destGUID == UnitGUID(unit) and (subEvent ~= "SPELL_CAST_SUCCESS" or select(8, UnitChannelInfo(unit)) == false) then
 			local duration = spell.duration
 			local _, class = UnitClass(unit)
 
-			--[[
-			if class == "PRIEST" or class == "SHAMAN" or class == "WARLOCK" then
-				duration = duration * 0.7
-			end
-
-			if UnitBuff(unit, "Burning Determination") or UnitBuff(unit, "Calming Waters") or UnitBuff(unit, "Casting Circle") then
-				duration = duration * 0.3
-			end
-]]
 			self.units[destGUID] = self.units[destGUID] or {}
 			self.units[destGUID].expires = GetTime() + duration
 			self.units[destGUID].spellId = spellId
 
 			-- Make sure we clear it after the duration
 			--C_Timer.After(duration, function()
-			LibStub("AceTimer-3.0"):ScheduleTimer(function() 
-				if self.AttachedFrames[unit] then
-                    self:ShowBigDebuffs(self.AttachedFrames[unit])
-                end
+			self:ScheduleTimer(self:UNIT_AURA_ALL_UNITS(), duration + 0.05, self) -- adding slight delay for checking expiring timer
 
-                if not unit:match("^raid") then
-                    self:UNIT_AURA(unit)
-                end
-			end, duration + 0.05) -- adding slight delay for checking expiring timer
+			-- This works 99% but I havn't tested it, it's to stop the AddOn from consuming memory in long sessions
+			--[[ 
+			self:ScheduleTimer(
+				function(self, guid) 
+					if self.units[guid] and self.units[guid].expires < GetTime() then 
+						self.units[guid] = nil 
+					end 
+				end
+			, 180, self, destGUID)
+			--]]
 
 			self:UNIT_AURA_ALL_UNITS()			
 
@@ -1030,7 +1051,7 @@ function BigDebuffs:UNIT_AURA_ALL_UNITS()
 		end
 
 		if not unit:match("^raid") then
-			self:UNIT_AURA(unit)
+			self:UNIT_AURA(nil, unit)
 		end
 	end
 end
@@ -1204,6 +1225,37 @@ end
 function BigDebuffs:UpdateStance(guid, spellid)
 	if self.stances[guid] == nil then
 		self.stances[guid] = {}
+	else
+		self:CancelTimer(self.stances[guid].timer)
+	end
+	
+	self.stances[guid].stance = spellid
+	self.stances[guid].timer = self:ScheduleTimer(self.ClearStanceGUID, 180, self, guid)
+
+	local unit = self:GetUnitFromGUID(guid)
+	if unit then
+		self:UNIT_AURA(nil, unit)
+	end
+end	
+
+function BigDebuffs:ClearStanceGUID(guid)
+	local unit = self:GetUnitFromGUID(guid)
+	if unit == nil then
+		self.stances[guid] = nil
+	else
+		self.stances[guid].timer = BigDebuffs:ScheduleTimer(self.ClearStanceGUID, 180, self, guid)
+	end
+end
+
+function BigDebuffs:GetUnitFromGUID(guid)
+	for _,unit in pairs(units) do
+		if UnitGUID(unit) == guid then
+			return unit
+		end
+	end
+	return nil
+end
+
 -- Copy this function to check for testing mode
 local function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter, isBossAura, isBossBuff, test)
 	local UnitDebuff = test and UnitDebuffTest or UnitDebuff
@@ -1221,20 +1273,13 @@ local function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter, 
 		duration = BigDebuffs.Spells[spellId].duration
 		expirationTime = spell.expires
 	else
-		self:CancelTimer(self.stances[guid].timer)
 		if (isBossBuff) then
 			name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitBuff(unit, index, filter);
 		else
 			name, rank, icon, count, debuffType, duration, expirationTime, unitCaster, canStealOrPurge, shouldConsolidate, spellId = UnitDebuff(unit, index, filter);
 		end
 	end
-	
-	self.stances[guid].stance = spellid
-	self.stances[guid].timer = self:ScheduleTimer(self.ClearStanceGUID, 180, self, guid)
 
-	local unit = self:GetUnitFromGUID(guid)
-	if unit then
-		self:UNIT_AURA(nil, unit)
 	debuffFrame.filter = filter;
 	debuffFrame.icon:SetTexture(icon);
 	if ( count > 1 ) then
@@ -1259,15 +1304,11 @@ local function CompactUnitFrame_UtilSetDebuff(debuffFrame, unit, index, filter, 
 	local color = DebuffTypeColor[debuffType] or DebuffTypeColor["none"];
 	debuffFrame.border:SetVertexColor(color.r, color.g, color.b);
 
-function BigDebuffs:ClearStanceGUID(guid)
-	local unit = self:GetUnitFromGUID(guid)
-	if unit == nil then
-		self.stances[guid] = nil
+
 	debuffFrame.isBossBuff = isBossBuff;
 	if ( isBossAura ) then
 		debuffFrame:SetSize(debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE, debuffFrame.baseSize + BOSS_DEBUFF_SIZE_INCREASE);
 	else
-		self.stances[guid].timer = BigDebuffs:ScheduleTimer(self.ClearStanceGUID, 180, self, guid)
 		debuffFrame:SetSize(debuffFrame.baseSize, debuffFrame.baseSize);
 	end
 
@@ -1322,7 +1363,7 @@ function BigDebuffs:ShowBigDebuffs(frame)
 			end
 		end
 	end
-
+	
 	-- check for interrupts
 	local guid = UnitGUID(frame.displayedUnit)
 	if guid and self.units[guid] and self.units[guid].expires and self.units[guid].expires > GetTime() then
@@ -1491,7 +1532,7 @@ function BigDebuffs:IsPriorityBigDebuff(id)
 	return self.Spells[id].priority
 end
 
-function BigDebuffs:UNIT_AURA(unit)
+function BigDebuffs:UNIT_AURA(event, unit)
 	if not self.db.profile.unitFrames.enabled or not self.db.profile.unitFrames[unit:gsub("%d", "")].enabled then return end
 
 	self:AttachUnitFrame(unit)
@@ -1547,22 +1588,24 @@ function BigDebuffs:UNIT_AURA(unit)
 
 	-- need to always look for a stance (if we only look for it once a player
 	-- changes stance we will never get back to it again once other auras fade)
-	-- Check for interrupt
 	local guid = UnitGUID(unit)
-	if self.stances[guid] then 
+	if self.stances[guid] then
 		local stanceId = self.stances[guid].stance
 		if stanceId and self.Spells[stanceId] then
 			n, _, ico = GetSpellInfo(stanceId)
-			local p = self:GetAuraPriority(n, stanceId)
+			local p = self:GetAuraPriority(stanceId)
 			if p and p >= priority then
 				left = 0
 				duration = 0
-				isAura = true
+				debuff = stanceId
 				priority = p
 				expires = 0
 				icon = ico
 			end
 		end
+	end
+	
+	-- Check for interrupt
 	if guid and self.units[guid] and self.units[guid].expires and self.units[guid].expires > GetTime() then
 		local spell = self.units[guid]
 		local spellId = spell.spellId
@@ -1577,7 +1620,7 @@ function BigDebuffs:UNIT_AURA(unit)
 		end		
 	end
 	
-
+	-- Update frame
 	if debuff then
 		if duration < 1 then duration = 1 end -- auras like Solar Beam don't have a duration
 
@@ -1595,8 +1638,17 @@ function BigDebuffs:UNIT_AURA(unit)
 			end
 		end
 		
-		frame.cooldown:SetCooldown(expires - duration, duration)
+		if duration > 1 then
+			frame.cooldown:SetCooldown(expires - duration, duration)
+			frame.cooldownContainer:Show()
+		else 
+			frame.cooldown:SetCooldown(0, 0)
+			frame.cooldownContainer:Hide()
+		end
+
 		frame:Show()
+		frame.current = icon
+		
 		--frame.cooldown:SetSwipeColor(0, 0, 0, 0.6)
 
 		-- set for tooltips
@@ -1616,15 +1668,15 @@ function BigDebuffs:UNIT_AURA(unit)
 end
 
 function BigDebuffs:PLAYER_FOCUS_CHANGED()
-	self:UNIT_AURA("focus")
+	self:UNIT_AURA(nil, "focus")
 end
 
 function BigDebuffs:PLAYER_TARGET_CHANGED()
-	self:UNIT_AURA("target")
+	self:UNIT_AURA(nil, "target")
 end
 
 function BigDebuffs:UNIT_PET()
-	self:UNIT_AURA("pet")
+	self:UNIT_AURA(nil, "pet")
 end
 
 -- Show extra buffs

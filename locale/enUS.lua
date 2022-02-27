@@ -82,6 +82,7 @@ L["Show this spell on the unit frames"] = true
 L["Show Tooltips"] = true
 L["Size"] = true
 L["special"] = "Special"
+L["Spell ID"] = true
 L["Spells"] = true
 L["Target Frame"] = true
 L["Toggle Test Mode"] = true

@@ -1,6 +1,19 @@
 local BigDebuffs = LibStub("AceAddon-3.0"):GetAddon("BigDebuffs")
 local L = LibStub("AceLocale-3.0"):GetLocale("BigDebuffs")
 
+local WarningDebuffs = {}
+for i = 1, #BigDebuffs.WarningDebuffs do
+	local id = BigDebuffs.WarningDebuffs[i]
+	local name = GetSpellInfo(id)
+	WarningDebuffs[name] = {
+		type = "toggle",
+		get = function(info) local key = info[#info-2] return BigDebuffs.db.profile[key].warningList[id] end,
+		set = function(info, value) local key = info[#info-2] BigDebuffs.db.profile[key].warningList[id] = value BigDebuffs:Refresh() end,
+		name = name,
+		desc = L["Show this debuff if present while BigDebuffs are displayed"],
+	}
+end
+
 local order = {
 	immunities = 1,
 	immunities_spells = 2,
@@ -35,8 +48,21 @@ for spellID, spell in pairs(BigDebuffs.Spells) do
 				BigDebuffs.db.profile.spells[spellID][name] = value
 				BigDebuffs:Refresh()
 			end,
-			name = function(info) local name = SpellNames[spellID] or GetSpellInfo(spellID) or spellID SpellNames[spellID] = name return name end,
-			icon = function() local icon = SpellIcons[spellID] or select(3,GetSpellInfo(spellID)) SpellIcons[spellID] = icon return icon end,
+            name = function(info)
+                local name = SpellNames[spellID] or GetSpellInfo(spellID)
+                SpellNames[spellID] = name
+                return name
+            end,
+            icon = function()
+                local icon = SpellIcons[spellID] or GetSpellTexture(spellID)
+                SpellIcons[spellID] = icon
+                return icon
+            end,
+			desc = function()
+                local spellDesc = GetSpellDescription(spellID) or ""
+                local extra = "\n\n|cffffd700"..L["Spell ID"].."|r "..spellID
+                return spellDesc..extra
+            end,
 			args = {
 				visibility = {
 					order = 1,
@@ -64,6 +90,13 @@ for spellID, spell in pairs(BigDebuffs.Spells) do
 						BigDebuffs:Refresh()
 					end,
 					args = {
+						raidFrames = raidFrames and {
+							type = "toggle",
+							name = L["Raid Frames"],
+							desc = L["Show this spell on the raid frames"],
+							width = "full",
+							order = 1,
+						} or nil,
 						unitFrames = {
 							type = "toggle",
 							name = L["Unit Frames"],
@@ -109,6 +142,51 @@ for spellID, spell in pairs(BigDebuffs.Spells) do
 						},
 					},
 				},
+				
+				size = raidFrames and {
+					name = L["Size"],
+					type = "group",
+					inline = true,
+					args = {
+						customSize = {
+							name = L["Custom Size"],
+							type = "toggle",
+							order = 4,
+							set = function(info, value)
+								local name = info[#info]
+								BigDebuffs.db.profile.spells[spellID] = BigDebuffs.db.profile.spells[spellID] or {}
+								BigDebuffs.db.profile.spells[spellID].customSize = value
+								if not value then
+									BigDebuffs.db.profile.spells[spellID].size = nil
+								end
+								BigDebuffs:Refresh()
+							end,
+						},
+						size = {
+							type = "range",
+							isPercent = true,
+							name = L["Size"],
+							desc = L["Set the custom size of this spell"],
+							get = function(info)
+								-- Pull the category size
+								return BigDebuffs.db.profile.spells[spellID] and BigDebuffs.db.profile.spells[spellID].size and
+									BigDebuffs.db.profile.spells[spellID].size/100 or
+									BigDebuffs.db.profile.raidFrames[string.lower(spell.type)]/100
+							end,
+							set = function(info, value)
+								local name = info[#info]
+								BigDebuffs.db.profile.spells[spellID] = BigDebuffs.db.profile.spells[spellID] or {}
+								BigDebuffs.db.profile.spells[spellID][name] = value*100
+								BigDebuffs:Refresh()
+							end,
+							disabled = function() return not BigDebuffs.db.profile.spells[spellID] or not BigDebuffs.db.profile.spells[spellID].customSize end,
+							min = 0,
+							max = 1,
+							step = 0.01,
+							order = 5,
+						},
+					},
+				} or nil,
 			},
 		}
 	end
@@ -131,7 +209,7 @@ function BigDebuffs:SetupOptions()
 			desc = {
 				order = 2,
 				type = "description",
-				name = "|cffffd700 "..L["Author"].."|r Jordon (WoTLK backport by Konjunktur) \n",
+				name = "|cffffd700 "..L["Author"].."|r Jordon (MoP backport by Konjunktur)\n",
 				cmdHidden = true
 			},
 			test = {
@@ -140,6 +218,188 @@ function BigDebuffs:SetupOptions()
 				order = 3,
 				func = "Test",
 				handler = BigDebuffs,
+			},
+			raidFrames = {
+				name = L["Raid Frames"],
+				type = "group",
+				disabled = function(info) return info[2] and not self.db.profile[info[1]].enabled end,
+				order = 10,
+				get = function(info) local name = info[#info] return self.db.profile.raidFrames[name] end,
+				set = function(info, value) local name = info[#info] self.db.profile.raidFrames[name] = value self:Refresh() end,
+				args = {
+					enabled = {
+						type = "toggle",
+						width = "normal",
+						disabled = false,
+						name = L["Enabled"],
+						desc = L["Enable BigDebuffs on raid frames"],
+						order = 1,
+					},
+					hideBliz = {
+						type = "toggle",
+						width = "normal",
+						name = L["Hide Other Debuffs"],
+						set = function(info, value)
+							if value then
+								self.db.profile.raidFrames.redirectBliz = false
+							end
+							self.db.profile.raidFrames.hideBliz = value
+							self:Refresh()
+						end,
+						desc = L["Hides other debuffs when BigDebuffs are displayed"],
+						order = 2,
+					},
+					redirectBliz = {
+						type = "toggle",
+						width = "normal",
+						name = L["Redirect Other Debuffs"],
+						set = function(info, value)
+							if value then
+								self.db.profile.raidFrames.hideBliz = false
+							end
+							self.db.profile.raidFrames.redirectBliz = value
+							self:Refresh()
+						end,
+						desc = L["Redirects other debuffs to the BigDebuffs anchor"],
+						order = 3,
+					},
+					cooldownCount = {
+						type = "toggle",
+						width = "normal",
+						name = L["Cooldown Count"],
+						desc = L["Allow Blizzard and other addons to display countdown text on the icons"],
+						order = 5,
+					},
+					increaseBuffs = {
+						type = "toggle",
+						width = "double",
+						name = L["Increase Maximum Buffs"],
+						desc = L["Sets the maximum buffs to 6"],
+						order = 4,
+					},
+					maxDebuffs = {
+						type = "range",
+						name = L["Max Debuffs"],
+						desc = L["Set the maximum number of debuffs displayed"],
+						min = 1,
+						max = 20,
+						step = 1,
+						order = 10,
+					},
+					anchor = {
+						name = L["Anchor"],
+						desc = L["Anchor to attach the BigDebuffs frames"],
+						type = "select",
+						values = {
+							["INNER"] = L["INNER"],
+							["LEFT"] = L["LEFT"],
+							["RIGHT"] = L["RIGHT"],
+						},
+						order = 11,
+					},
+					scale = {
+						name = L["Size"],
+						type = "group",
+						inline = true,
+						order = 20,
+						get = function(info) local name = info[#info] return self.db.profile.raidFrames[name]/100 end,
+						set = function(info, value) local name = info[#info] self.db.profile.raidFrames[name] = value*100 self:Refresh() end,
+						args = {
+							dispellable = {
+								type = "range",
+								isPercent = true,
+								name = L["Dispellable CC"],
+								desc = L["Set the size of dispellable crowd control debuffs"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 1,
+								get = function(info) local name = info[#info] return self.db.profile.raidFrames.dispellable.cc/100 end,
+								set = function(info, value) local name = info[#info] self.db.profile.raidFrames.dispellable.cc = value*100 self:Refresh() end,
+							},
+							cc = {
+								type = "range",
+								isPercent = true,
+								name = L["Other CC"],
+								desc = L["Set the size of crowd control debuffs"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 2,
+							},
+							warning = {
+								type = "range",
+								isPercent = true,
+								name = L["Warning Debuffs"],
+								desc = L["Set the size of warning debuffs"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 6,
+							},
+							dispellableRoots = {
+								type = "range",
+								isPercent = true,
+								name = L["Dispellable Roots"],
+								desc = L["Set the size of dispellable roots"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 4,
+								get = function(info) local name = info[#info] return self.db.profile.raidFrames.dispellable.roots/100 end,
+								set = function(info, value) local name = info[#info] self.db.profile.raidFrames.dispellable.roots= value*100 self:Refresh() end,
+							},
+							roots = {
+								type = "range",
+								isPercent = true,
+								name = L["Other Roots"],
+								desc = L["Set the size of roots"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 5,
+							},
+							default = {
+								type = "range",
+								isPercent = true,
+								name = L["Other Debuffs"],
+								desc = L["Set the size of other debuffs"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 7,
+							},
+							pve = {
+								type = "range",
+								isPercent = true,
+								name = L["Dispellable PvE"],
+								desc = L["Set the size of dispellable PvE debuffs"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 3,
+							},
+							interrupts = {
+								type = "range",
+								isPercent = true,
+								name = L["interrupts"],
+								desc = L["Set the size of interrupts"],
+								min = 0,
+								max = 1,
+								step = 0.01,
+								order = 8,
+							},
+						},
+					},
+					warning = {
+						name = L["Warning Debuffs"],
+						order = 30,
+						type = "group",
+						inline = true,
+						args = WarningDebuffs,
+					}	
+					
+				}
 			},
 			unitFrames = {
 				name = L["Unit Frames"],
@@ -150,26 +410,27 @@ function BigDebuffs:SetupOptions()
 				get = function(info) local name = info[#info] return self.db.profile.unitFrames[name] end,
 				set = function(info, value) local name = info[#info] self.db.profile.unitFrames[name] = value self:Refresh() end,
 				args = {
-					general = {
-						name = "General",
-						type = "group",
-						order = 10,
-						inline = true,
-						args = {
-							enabled = {
-								type = "toggle",
-								disabled = false,
-								width = "normal",
-								name = L["Enabled"],
-								desc = L["Enable BigDebuffs on unit frames"],
-							},
-							cooldownCount = {
-								type = "toggle",
-								width = "normal",
-								name = L["Cooldown Count"],
-								desc = L["Allow Blizzard and other addons to display countdown text on the icons"],
-							},
-						},
+					enabled = {
+						type = "toggle",
+						disabled = false,
+						width = "full",
+						name = L["Enabled"],
+						desc = L["Enable BigDebuffs on unit frames"],
+						order = 1,
+					},
+					cooldownCount = {
+						type = "toggle",
+						width = "full",
+						name = L["Cooldown Count"],
+						desc = L["Allow Blizzard and other addons to display countdown text on the icons"],
+						order = 2,
+					},
+					tooltips = {
+						type = "toggle",
+						width = "full",
+						name = L["Show Tooltips"],
+						desc = L["Show spell information when mousing over the icon"],
+						order = 3,
 					},
 					player = {
 						type = "group",
@@ -637,4 +898,5 @@ function BigDebuffs:SetupOptions()
 	LibDualSpec:EnhanceOptions(self.options.plugins.profiles.profiles, self.db)
 
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("BigDebuffs", self.options)
+	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("BigDebuffs", "BigDebuffs")
 end

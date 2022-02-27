@@ -1,6 +1,6 @@
 # BigDebuffs
 
-BigDebuffs is an _extremely lightweight_ addon which replaces unit frame portraits with auras, stances and interrupts whenever present.
+BigDebuffs is an _extremely lightweight_ addon that hooks the Blizzard raid frames to increase the debuff size of crowd control effects. Additionally, it replaces unit frame portraits with debuff durations when important debuffs are present.
 
 The addon menu can be accessed by typing /bd or /bigdebuffs.
 
@@ -21,6 +21,10 @@ The backport is based on BfA BigDebuffs. However, the backport does not contain 
 
 > [Jakeswork][2] for his completion of the WotLK aura list, minor bug fixes and the Warrior stance logic addition.
 
+> **Developer's Note:** I'd like to thank the following people for their contributions to this release:
+>  [NorkTheOrc][1] for his meticulous overhaul of the spell list. Most of the additions and fixes in this release were sent in by him.
+>  [Pride][2] for his help updating the spell list.
+>  [Jax][3] for his awesome concept of showing interrupts as a debuff, which I've fully integrated into this release.
 
 [1]: https://github.com/jordonwow
 [2]: https://github.com/jakeswork
