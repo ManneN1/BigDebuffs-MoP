@@ -8,23 +8,25 @@ The addon menu can be accessed by typing /bd or /bigdebuffs.
 
 To download this addon, hit the **green "Code" button** and then select `Download ZIP`.
 
-Once the addon is finished downloading, extract the contents to your `Interface/AddOns` directory and **importantly** rename the folder from `BigDebuffs-WoTLK-master` to `BigDebuffs`.
+Once the addon is finished downloading, extract the contents to your `Interface/AddOns` directory and **importantly** rename the folder from `BigDebuffs-MoP-master` to `BigDebuffs`.
 
 ### Backport Notes
-The backport is based on BfA BigDebuffs. However, the backport does not contain any raid frame modifications (number of debuffs shown / crowd control effects) since the new raid frames do not exist in WotLK (they were implemented in Cataclysm). The backport is essentially a much improved version of LoseControl.
-
+* The backport is based on Legion/BfA BigDebuffs.
+* The spell list is not optimized and could contain faults.  Feel free to create an issue or a pull request if you have an improvement suggestion.
+* You can scale the size of the cooldown spiral with this version of the AddOn. This means you can e.g. fit it more tightly to the portrait of the unit.
 ---
 **Contributions**
 
  I'd like to thank the following people for their contributions to this release:
 > [Jordon][1] for the base addon, as developed throughout MoP-BfA (and possibly further).
 
-> [Jakeswork][2] for his completion of the WotLK aura list, minor bug fixes and the Warrior stance logic addition.
+> [Jakeswork][2] for his help with minor bug fixes and the Warrior stance logic addition.
 
-> **Developer's Note:** I'd like to thank the following people for their contributions to this release:
->  [NorkTheOrc][1] for his meticulous overhaul of the spell list. Most of the additions and fixes in this release were sent in by him.
->  [Pride][2] for his help updating the spell list.
->  [Jax][3] for his awesome concept of showing interrupts as a debuff, which I've fully integrated into this release.
+> **Developer's Note:** 
+> I'd like to thank the following people for their contributions to this release:
+> [Jax][3] for his awesome concept of showing interrupts as a debuff, which I've fully integrated into this release.
+> The unknown contributor who created a semi-working version (most things worked, just not the test function and the stance logic etc) that I randomly found on the interwebs.
 
 [1]: https://github.com/jordonwow
 [2]: https://github.com/jakeswork
+[3]: https://twitter.com/jaxirl
