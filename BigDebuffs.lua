@@ -819,7 +819,7 @@ function BigDebuffs:AttachUnitFrame(unit)
 		frame.cooldown:SetParent(frame.cooldownContainer)
 		frame.cooldown:SetAllPoints()
 		frame.cooldown:SetAlpha(0.9)
-		
+		frame.cooldownContainer:EnableMouse(false)
 		frame:RegisterForDrag("LeftButton")
 		frame:SetMovable(true)
 		frame.unit = unit
